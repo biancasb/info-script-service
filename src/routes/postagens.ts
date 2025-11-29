@@ -1,0 +1,811 @@
+import { FastifyInstance } from 'fastify';
+import { ObjectId } from 'mongodb';
+import { getDatabase } from '../config/database';
+import { Postagem, CriarPostagemDTO, AtualizarPostagemDTO } from '../types/postagem';
+import { Usuario, Cargo } from '../types/usuario';
+import { Materia } from '../types/materia';
+import { JWTPayload } from '../types/auth';
+import { postagemSchema, criarPostagemSchema } from '../schemas/postagem.schema';
+import { COLLECTIONS } from '../constants';
+
+export async function postagensRoutes(fastify: FastifyInstance) {
+  
+  // GET - Feed unificado (personalizado se autenticado, geral se não)
+  fastify.get<{ Querystring: { tag?: string } }>(
+    '/postagens',
+    {
+      onRequest: [fastify.optionalAuthenticate],
+      schema: {
+        tags: ['Postagens'],
+        description: 'Retorna feed de postagens. Se autenticado: feed personalizado (usuário + quem ele segue). Se não autenticado: todas as postagens. Filtro opcional por tag.',
+        security: [{ bearerAuth: [] }, {}],
+        querystring: {
+          type: 'object',
+          properties: {
+            tag: { type: 'string', description: 'Filtrar por disciplina/matéria' }
+          }
+        },
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+              count: { type: 'number' },
+              authenticated: { type: 'boolean', description: 'Se o usuário está autenticado' },
+              feedType: { type: 'string', enum: ['personalizado', 'geral'], description: 'Tipo de feed retornado' },
+              data: {
+                type: 'array',
+                items: postagemSchema
+              }
+            }
+          }
+        }
+      }
+    },
+    async (request, reply) => {
+      try {
+        const { tag } = request.query;
+        const db = getDatabase();
+
+        let query: any = {};
+        let feedType: 'personalizado' | 'geral' = 'geral';
+        let authenticated = false;
+
+        // Verifica se está autenticado
+        if (request.user) {
+          const { userId } = request.user as JWTPayload;
+          authenticated = true;
+          feedType = 'personalizado';
+
+          // Busca quem o usuário está seguindo
+          const usuario = await db.collection<Usuario>(COLLECTIONS.USUARIOS)
+            .findOne({ _id: new ObjectId(userId) });
+          
+          if (usuario) {
+            // Feed personalizado: usuário + quem ele segue
+            const idsParaBuscar = [
+              new ObjectId(userId),
+              ...(usuario.seguindo || [])
+            ];
+            
+            query.autorId = { $in: idsParaBuscar };
+          }
+        }
+
+        // Filtro por tag (se fornecido)
+        if (tag) {
+          query.tag = { $regex: new RegExp(`^${tag}$`, 'i') };
+        }
+
+        const postagens = await db.collection<Postagem>(COLLECTIONS.POSTAGENS)
+          .aggregate([
+            {
+              $match: query
+            },
+            {
+              $addFields: {
+                totalCurtidas: { $size: { $ifNull: ['$curtidas', []] } }
+              }
+            },
+            {
+              $sort: { criadoEm: -1 }
+            }
+          ])
+          .toArray();
+        
+        return {
+          success: true,
+          count: postagens.length,
+          authenticated,
+          feedType,
+          data: postagens,
+        };
+      } catch (error) {
+        fastify.log.error(error);
+        return reply.status(500).send({
+          success: false,
+          error: 'Erro ao buscar feed de postagens',
+        });
+      }
+    }
+  );
+
+  // GET - Buscar uma postagem por ID
+  fastify.get<{ Params: { id: string } }>('/postagens/:id', async (request, reply) => {
+    try {
+      const { id } = request.params;
+      
+      if (!ObjectId.isValid(id)) {
+        return reply.status(400).send({
+          success: false,
+          error: 'ID inválido',
+        });
+      }
+      
+      const db = getDatabase();
+      const postagens = await db.collection<Postagem>(COLLECTIONS.POSTAGENS)
+        .aggregate([
+          {
+            $match: { _id: new ObjectId(id) }
+          },
+          {
+            $addFields: {
+              totalCurtidas: { $size: { $ifNull: ['$curtidas', []] } }
+            }
+          }
+        ])
+        .toArray();
+      
+      if (!postagens || postagens.length === 0) {
+        return reply.status(404).send({
+          success: false,
+          error: 'Postagem não encontrada',
+        });
+      }
+      
+      return {
+        success: true,
+        data: postagens[0],
+      };
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.status(500).send({
+        success: false,
+        error: 'Erro ao buscar postagem',
+      });
+    }
+  });
+
+  // GET - Listar postagens de um usuário específico
+  fastify.get<{ Params: { usuarioId: string } }>(
+    '/postagens/usuario/:usuarioId',
+    async (request, reply) => {
+      try {
+        const { usuarioId } = request.params;
+        
+        if (!ObjectId.isValid(usuarioId)) {
+          return reply.status(400).send({
+            success: false,
+            error: 'ID de usuário inválido',
+          });
+        }
+        
+        const db = getDatabase();
+        const postagens = await db.collection<Postagem>(COLLECTIONS.POSTAGENS)
+          .aggregate([
+            {
+              $match: { autorId: new ObjectId(usuarioId) }
+            },
+            {
+              $addFields: {
+                totalCurtidas: { $size: { $ifNull: ['$curtidas', []] } }
+              }
+            },
+            {
+              $sort: { criadoEm: -1 }
+            }
+          ])
+          .toArray();
+        
+        return {
+          success: true,
+          count: postagens.length,
+          data: postagens,
+        };
+      } catch (error) {
+        fastify.log.error(error);
+        return reply.status(500).send({
+          success: false,
+          error: 'Erro ao buscar postagens do usuário',
+        });
+      }
+    }
+  );
+
+  // GET - Listar postagens por tag (disciplina)
+  fastify.get<{ Params: { tag: string } }>(
+    '/postagens/tag/:tag',
+    async (request, reply) => {
+      try {
+        const { tag } = request.params;
+        
+        const db = getDatabase();
+        // Busca case-insensitive
+        const postagens = await db.collection<Postagem>(COLLECTIONS.POSTAGENS)
+          .aggregate([
+            {
+              $match: { tag: { $regex: new RegExp(`^${tag}$`, 'i') } }
+            },
+            {
+              $addFields: {
+                totalCurtidas: { $size: { $ifNull: ['$curtidas', []] } }
+              }
+            },
+            {
+              $sort: { criadoEm: -1 }
+            }
+          ])
+          .toArray();
+        
+        return {
+          success: true,
+          count: postagens.length,
+          tag,
+          data: postagens,
+        };
+      } catch (error) {
+        fastify.log.error(error);
+        return reply.status(500).send({
+          success: false,
+          error: 'Erro ao buscar postagens por tag',
+        });
+      }
+    }
+  );
+
+  // GET - Listar todas as tags únicas
+  fastify.get('/postagens/tags/lista', async (_request, reply) => {
+    try {
+      const db = getDatabase();
+      const tags = await db.collection<Postagem>(COLLECTIONS.POSTAGENS)
+        .distinct('tag');
+      
+      return {
+        success: true,
+        count: tags.length,
+        data: tags.sort(),
+      };
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.status(500).send({
+        success: false,
+        error: 'Erro ao buscar tags',
+      });
+    }
+  });
+
+  // POST - Criar uma nova postagem
+  fastify.post<{ Body: CriarPostagemDTO }>(
+    '/postagens',
+    {
+      schema: {
+        tags: ['Postagens'],
+        description: 'Cria uma nova postagem vinculada a um usuário',
+        body: criarPostagemSchema,
+        response: {
+          201: {
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+              message: { type: 'string' },
+              data: postagemSchema
+            }
+          },
+          400: {
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+              error: { type: 'string' }
+            }
+          },
+          404: {
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+              error: { type: 'string', description: 'Mensagem de erro' }
+            }
+          }
+        }
+      }
+    },
+    async (request, reply) => {
+      try {
+        const { titulo, texto, tag, autorId } = request.body;
+        
+        // Validações
+        if (!titulo || !texto || !tag || !autorId) {
+          return reply.status(400).send({
+            success: false,
+            error: 'Todos os campos são obrigatórios: titulo, texto, tag, autorId',
+          });
+        }
+
+        if (!ObjectId.isValid(autorId)) {
+          return reply.status(400).send({
+            success: false,
+            error: 'ID de autor inválido',
+          });
+        }
+
+        const db = getDatabase();
+        
+        // Verifica se o usuário existe
+        const usuario = await db.collection<Usuario>(COLLECTIONS.USUARIOS)
+          .findOne({ _id: new ObjectId(autorId) });
+        
+        if (!usuario) {
+          return reply.status(404).send({
+            success: false,
+            error: 'Usuário não encontrado',
+          });
+        }
+
+        // Se o usuário for estudante, verifica se está matriculado em pelo menos uma matéria
+        if (usuario.cargo === Cargo.ESTUDANTE) {
+          const materiasDoEstudante = await db.collection<Materia>(COLLECTIONS.MATERIAS)
+            .countDocuments({ 
+              estudantesMatriculados: new ObjectId(autorId) 
+            });
+          
+          if (materiasDoEstudante === 0) {
+            return reply.status(403).send({
+              success: false,
+              error: 'Estudantes precisam estar matriculados em pelo menos uma matéria para criar postagens',
+            });
+          }
+        }
+
+        // Verifica se a tag (matéria) existe no sistema
+        const materiaExiste = await db.collection<Materia>(COLLECTIONS.MATERIAS)
+          .findOne({ 
+            nome: { $regex: new RegExp(`^${tag}$`, 'i') } 
+          });
+        
+        if (!materiaExiste) {
+          return reply.status(400).send({
+            success: false,
+            error: 'A tag informada não corresponde a nenhuma matéria cadastrada no sistema',
+          });
+        }
+        
+        const novaPostagem: Postagem = {
+          titulo,
+          texto,
+          tag: materiaExiste.nome, // Usa o nome correto da matéria
+          autorId: new ObjectId(autorId),
+          autorNome: usuario.nome,
+          autorNickname: usuario.nickname,
+          curtidas: [],
+          criadoEm: new Date(),
+          atualizadoEm: new Date(),
+        };
+        
+        const result = await db.collection<Postagem>(COLLECTIONS.POSTAGENS).insertOne(novaPostagem);
+        
+        return reply.status(201).send({
+          success: true,
+          message: 'Postagem criada com sucesso',
+          data: {
+            ...novaPostagem,
+            _id: result.insertedId,
+          },
+        });
+      } catch (error) {
+        fastify.log.error(error);
+        return reply.status(500).send({
+          success: false,
+          error: 'Erro ao criar postagem',
+        });
+      }
+    }
+  );
+
+  // PUT - Atualizar uma postagem
+  fastify.put<{ Params: { id: string }; Body: AtualizarPostagemDTO & { autorId: string } }>(
+    '/postagens/:id',
+    async (request, reply) => {
+      try {
+        const { id } = request.params;
+        const { titulo, texto, tag, autorId } = request.body;
+        
+        if (!ObjectId.isValid(id)) {
+          return reply.status(400).send({
+            success: false,
+            error: 'ID inválido',
+          });
+        }
+
+        if (!autorId || !ObjectId.isValid(autorId)) {
+          return reply.status(400).send({
+            success: false,
+            error: 'ID de autor é obrigatório e deve ser válido',
+          });
+        }
+        
+        const db = getDatabase();
+        
+        // Verifica se a postagem existe
+        const postagemExistente = await db.collection<Postagem>(COLLECTIONS.POSTAGENS)
+          .findOne({ _id: new ObjectId(id) });
+        
+        if (!postagemExistente) {
+          return reply.status(404).send({
+            success: false,
+            error: 'Postagem não encontrada',
+          });
+        }
+
+        // Verifica se o usuário é o autor da postagem
+        if (postagemExistente.autorId.toString() !== autorId) {
+          return reply.status(403).send({
+            success: false,
+            error: 'Você não tem permissão para editar esta postagem',
+          });
+        }
+        
+        const updateData: Partial<Postagem> = {
+          atualizadoEm: new Date(),
+        };
+        
+        if (titulo) updateData.titulo = titulo;
+        if (texto) updateData.texto = texto;
+        if (tag) updateData.tag = tag;
+        
+        if (Object.keys(updateData).length === 1) { // Apenas atualizadoEm
+          return reply.status(400).send({
+            success: false,
+            error: 'Nenhum campo para atualizar',
+          });
+        }
+        
+        const result = await db.collection<Postagem>(COLLECTIONS.POSTAGENS).findOneAndUpdate(
+          { _id: new ObjectId(id) },
+          { $set: updateData },
+          { returnDocument: 'after' }
+        );
+        
+        if (!result) {
+          return reply.status(404).send({
+            success: false,
+            error: 'Postagem não encontrada',
+          });
+        }
+        
+        return {
+          success: true,
+          message: 'Postagem atualizada com sucesso',
+          data: result,
+        };
+      } catch (error) {
+        fastify.log.error(error);
+        return reply.status(500).send({
+          success: false,
+          error: 'Erro ao atualizar postagem',
+        });
+      }
+    }
+  );
+
+  // DELETE - Deletar uma postagem
+  fastify.delete<{ Params: { id: string }; Body: { autorId: string } }>(
+    '/postagens/:id',
+    async (request, reply) => {
+      try {
+        const { id } = request.params;
+        const { autorId } = request.body;
+        
+        if (!ObjectId.isValid(id)) {
+          return reply.status(400).send({
+            success: false,
+            error: 'ID inválido',
+          });
+        }
+
+        if (!autorId || !ObjectId.isValid(autorId)) {
+          return reply.status(400).send({
+            success: false,
+            error: 'ID de autor é obrigatório e deve ser válido',
+          });
+        }
+        
+        const db = getDatabase();
+        
+        // Verifica se a postagem existe
+        const postagem = await db.collection<Postagem>(COLLECTIONS.POSTAGENS)
+          .findOne({ _id: new ObjectId(id) });
+        
+        if (!postagem) {
+          return reply.status(404).send({
+            success: false,
+            error: 'Postagem não encontrada',
+          });
+        }
+
+        // Verifica se o usuário é o autor da postagem
+        if (postagem.autorId.toString() !== autorId) {
+          return reply.status(403).send({
+            success: false,
+            error: 'Você não tem permissão para deletar esta postagem',
+          });
+        }
+        
+        const result = await db.collection<Postagem>(COLLECTIONS.POSTAGENS)
+          .deleteOne({ _id: new ObjectId(id) });
+        
+        if (result.deletedCount === 0) {
+          return reply.status(404).send({
+            success: false,
+            error: 'Postagem não encontrada',
+          });
+        }
+        
+        return {
+          success: true,
+          message: 'Postagem deletada com sucesso',
+        };
+      } catch (error) {
+        fastify.log.error(error);
+        return reply.status(500).send({
+          success: false,
+          error: 'Erro ao deletar postagem',
+        });
+      }
+    }
+  );
+
+  // ==================== CURTIDAS ====================
+
+  // POST - Toggle curtir/descurtir uma postagem (autenticado)
+  fastify.post<{ Body: { postagemId: string } }>(
+    '/postagens/toggle-curtida',
+    {
+      onRequest: [fastify.authenticate],
+      schema: {
+        tags: ['Postagens'],
+        description: 'Toggle curtir/descurtir uma postagem (requer autenticação)',
+        security: [{ bearerAuth: [] }],
+        body: {
+          type: 'object',
+          required: ['postagemId'],
+          properties: {
+            postagemId: { type: 'string', description: 'ID da postagem' }
+          }
+        },
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+              message: { type: 'string' },
+              action: { type: 'string', enum: ['curtiu', 'descurtiu'], description: 'Ação realizada' },
+              totalCurtidas: { type: 'number' }
+            }
+          },
+          400: {
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+              error: { type: 'string' }
+            }
+          }
+        }
+      }
+    },
+    async (request, reply) => {
+      try {
+        const { userId } = request.user as JWTPayload;
+        const { postagemId } = request.body;
+        
+        // Validações
+        if (!postagemId) {
+          return reply.status(400).send({
+            success: false,
+            error: 'postagemId é obrigatório',
+          });
+        }
+
+        if (!ObjectId.isValid(postagemId)) {
+          return reply.status(400).send({
+            success: false,
+            error: 'ID de postagem inválido',
+          });
+        }
+
+        const db = getDatabase();
+        const usuarioObjId = new ObjectId(userId);
+        const postagemObjId = new ObjectId(postagemId);
+        
+        // Verifica se a postagem existe
+        const postagem = await db.collection<Postagem>(COLLECTIONS.POSTAGENS).findOne({ _id: postagemObjId });
+        
+        if (!postagem) {
+          return reply.status(404).send({
+            success: false,
+            error: 'Postagem não encontrada',
+          });
+        }
+
+        // Verifica se já curtiu
+        const jaCurtiu = postagem.curtidas?.some(id => id.toString() === userId);
+        
+        let result;
+        let action: 'curtiu' | 'descurtiu';
+        
+        if (jaCurtiu) {
+          // Descurte
+          result = await db.collection<Postagem>(COLLECTIONS.POSTAGENS).findOneAndUpdate(
+            { _id: postagemObjId },
+            { 
+              $pull: { curtidas: usuarioObjId },
+              $set: { atualizadoEm: new Date() }
+            },
+            { returnDocument: 'after' }
+          );
+          action = 'descurtiu';
+        } else {
+          // Curte
+          result = await db.collection<Postagem>(COLLECTIONS.POSTAGENS).findOneAndUpdate(
+            { _id: postagemObjId },
+            { 
+              $addToSet: { curtidas: usuarioObjId },
+              $set: { atualizadoEm: new Date() }
+            },
+            { returnDocument: 'after' }
+          );
+          action = 'curtiu';
+        }
+        
+        return {
+          success: true,
+          message: action === 'curtiu' ? 'Postagem curtida com sucesso' : 'Curtida removida com sucesso',
+          action,
+          totalCurtidas: result?.curtidas?.length || 0,
+        };
+      } catch (error) {
+        fastify.log.error(error);
+        return reply.status(500).send({
+          success: false,
+          error: 'Erro ao processar requisição',
+        });
+      }
+    }
+  );
+
+  // GET - Listar usuários que curtiram uma postagem
+  fastify.get<{ Params: { postagemId: string } }>(
+    '/postagens/:postagemId/curtidas',
+    {
+      schema: {
+        tags: ['Postagens'],
+        description: 'Lista todos os usuários que curtiram uma postagem',
+        params: {
+          type: 'object',
+          properties: {
+            postagemId: { type: 'string', description: 'ID da postagem' }
+          },
+          required: ['postagemId']
+        },
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+              totalCurtidas: { type: 'number' },
+              data: {
+                type: 'array',
+                items: {
+                  type: 'object'
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    async (request, reply) => {
+      try {
+        const { postagemId } = request.params;
+        
+        if (!ObjectId.isValid(postagemId)) {
+          return reply.status(400).send({
+            success: false,
+            error: 'ID de postagem inválido',
+          });
+        }
+
+        const db = getDatabase();
+        const postagem = await db.collection<Postagem>(COLLECTIONS.POSTAGENS)
+          .findOne({ _id: new ObjectId(postagemId) });
+        
+        if (!postagem) {
+          return reply.status(404).send({
+            success: false,
+            error: 'Postagem não encontrada',
+          });
+        }
+
+        if (!postagem.curtidas || postagem.curtidas.length === 0) {
+          return {
+            success: true,
+            totalCurtidas: 0,
+            data: [],
+          };
+        }
+
+        // Busca os dados dos usuários que curtiram
+        const usuariosQueCurtiram = await db.collection<Usuario>(COLLECTIONS.USUARIOS)
+          .find({ _id: { $in: postagem.curtidas } })
+          .project({ senha: 0 }) // Não retorna a senha
+          .toArray();
+        
+        return {
+          success: true,
+          totalCurtidas: usuariosQueCurtiram.length,
+          data: usuariosQueCurtiram,
+        };
+      } catch (error) {
+        fastify.log.error(error);
+        return reply.status(500).send({
+          success: false,
+          error: 'Erro ao buscar curtidas',
+        });
+      }
+    }
+  );
+
+  // GET - Postagens mais curtidas (ranking)
+  fastify.get('/postagens/ranking/curtidas', {
+    schema: {
+      tags: ['Postagens'],
+      description: 'Retorna ranking das 20 postagens mais curtidas',
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            count: { type: 'number' },
+            data: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  _id: { type: 'string' },
+                  titulo: { type: 'string' },
+                  texto: { type: 'string' },
+                  tag: { type: 'string' },
+                  autorNome: { type: 'string' },
+                  totalCurtidas: { type: 'number' },
+                  criadoEm: { type: 'string', format: 'date-time' }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }, async (_request, reply) => {
+    try {
+      const db = getDatabase();
+      
+      // Busca postagens ordenadas por número de curtidas
+      const postagens = await db.collection<Postagem>(COLLECTIONS.POSTAGENS)
+        .aggregate([
+          {
+            $addFields: {
+              totalCurtidas: { $size: { $ifNull: ['$curtidas', []] } }
+            }
+          },
+          {
+            $sort: { totalCurtidas: -1 }
+          },
+          {
+            $limit: 20 // Top 20
+          }
+        ])
+        .toArray();
+      
+      return {
+        success: true,
+        count: postagens.length,
+        data: postagens,
+      };
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.status(500).send({
+        success: false,
+        error: 'Erro ao buscar ranking de curtidas',
+      });
+    }
+  });
+}
+
