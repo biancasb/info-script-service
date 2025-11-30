@@ -718,3 +718,4 @@ Token contém tudo:
 **Arquivo:** `COMO-FUNCIONA-SESSAO.md`  
 **Data:** 29 de Novembro de 2024
 
+
