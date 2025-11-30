@@ -504,3 +504,4 @@ Agora você sabe como autenticar no Swagger!
 **Data:** 29/11/2024  
 **API:** InfoScript Backend v1.0.0
 
+

@@ -337,3 +337,4 @@ Agora você pode testar todas as APIs pelo Swagger sem erros!
 **Data:** 29/11/2024  
 **Status:** ✅ Corrigido e Funcionando
 
+
