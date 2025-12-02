@@ -204,46 +204,33 @@ Postagem (1) ──── (N) Usuario (curtidas)
 
 ### Nomenclatura
 ```typescript
-// Variáveis e funções: camelCase
 const userId = '123';
 function getUserById() {}
 
-// Tipos e Interfaces: PascalCase
 interface Usuario {}
 type JWTPayload = {};
 
-// Constantes: UPPER_SNAKE_CASE
 const ERROR_MESSAGES = {};
 const HTTP_STATUS = {};
-
-// Arquivos: kebab-case
-// usuario.schema.ts
-// error-handler.ts
 ```
 
 ### Imports
 ```typescript
-// 1. Bibliotecas externas
 import { FastifyInstance } from 'fastify';
 import { ObjectId } from 'mongodb';
 
-// 2. Configurações
 import { config } from '../config/env';
 
-// 3. Tipos
 import { Usuario, Cargo } from '../types';
 
-// 4. Utils e helpers
 import { isValidObjectId } from '../utils';
 
-// 5. Constantes
 import { ERROR_MESSAGES, HTTP_STATUS } from '../constants';
 ```
 
 ### Error Handling
 ```typescript
 try {
-  // Lógica
   const result = await operation();
   return successResponse(result);
 } catch (error) {
@@ -310,5 +297,5 @@ tests/
 
 ---
 
-**Última atualização:** 29/11/2024
+**Última atualização:** 01/12/2025
 

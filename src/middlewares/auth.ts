@@ -27,7 +27,6 @@ export async function authenticate(
  */
 export async function optionalAuthenticate(
   request: FastifyRequest,
-  reply: FastifyReply
 ): Promise<void> {
   try {
     await request.jwtVerify();

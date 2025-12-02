@@ -294,6 +294,6 @@ Se quiser **100% de documentação**, podemos:
 ---
 
 **Status:** ✅ Pronto para uso  
-**Última atualização:** 29/11/2024
+**Última atualização:** 01/12/2025
 
 

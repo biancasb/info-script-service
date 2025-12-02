@@ -324,5 +324,5 @@ Dúvidas? Entre em contato:
 
 ---
 
-**Última atualização:** 29/11/2024
+**Última atualização:** 01/12/2025
 

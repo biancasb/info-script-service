@@ -2,7 +2,7 @@
 
 Todas as mudanças notáveis deste projeto serão documentadas neste arquivo.
 
-## [2.0.0] - 29/11/2024
+## [2.0.0] - 01/12/2025
 
 ### 🎉 Refatoração Completa
 
@@ -38,7 +38,7 @@ Todas as mudanças notáveis deste projeto serão documentadas neste arquivo.
 
 ---
 
-## [1.0.0] - 29/11/2024
+## [1.0.0] - 01/12/2025
 
 ### Sistema de Autenticação JWT
 
@@ -70,7 +70,7 @@ Todas as mudanças notáveis deste projeto serão documentadas neste arquivo.
 
 ---
 
-## [0.9.0] - 29/11/2024
+## [0.9.0] - 01/12/2025
 
 ### Sistema de Matérias
 

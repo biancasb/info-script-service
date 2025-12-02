@@ -51,18 +51,15 @@ export async function postagensRoutes(fastify: FastifyInstance) {
         let feedType: 'personalizado' | 'geral' = 'geral';
         let authenticated = false;
 
-        // Verifica se está autenticado
         if (request.user) {
           const { userId } = request.user as JWTPayload;
           authenticated = true;
           feedType = 'personalizado';
 
-          // Busca quem o usuário está seguindo
           const usuario = await db.collection<Usuario>(COLLECTIONS.USUARIOS)
             .findOne({ _id: new ObjectId(userId) });
           
           if (usuario) {
-            // Feed personalizado: usuário + quem ele segue
             const idsParaBuscar = [
               new ObjectId(userId),
               ...(usuario.seguindo || [])
@@ -72,7 +69,6 @@ export async function postagensRoutes(fastify: FastifyInstance) {
           }
         }
 
-        // Filtro por tag (se fornecido)
         if (tag) {
           query.tag = { $regex: new RegExp(`^${tag}$`, 'i') };
         }
@@ -371,7 +367,16 @@ export async function postagensRoutes(fastify: FastifyInstance) {
         };
         
         const result = await db.collection<Postagem>(COLLECTIONS.POSTAGENS).insertOne(novaPostagem);
-        
+
+        // Vincula o autor à matéria (tag) ao criar a postagem
+        await db.collection<Materia>(COLLECTIONS.MATERIAS).updateOne(
+          { nome: { $regex: new RegExp(`^${materiaExiste.nome}$`, 'i') } },
+          {
+            $addToSet: { estudantesMatriculados: new ObjectId(autorId) },
+            $set: { atualizadoEm: new Date() }
+          }
+        );
+
         return reply.status(201).send({
           success: true,
           message: 'Postagem criada com sucesso',
@@ -479,20 +484,77 @@ export async function postagensRoutes(fastify: FastifyInstance) {
   // DELETE - Deletar uma postagem
   fastify.delete<{ Params: { id: string }; Body: { autorId: string } }>(
     '/postagens/:id',
+    {
+      schema: {
+        tags: ['Postagens'],
+        description: 'Deleta uma postagem pelo ID. Apenas o autor pode deletar. Se esta for a última postagem do autor com a mesma tag (matéria), o autor é desvinculado da matéria automaticamente.',
+        params: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', description: 'ID da postagem' }
+          },
+          required: ['id']
+        },
+        body: {
+          type: 'object',
+          properties: {
+            autorId: { type: 'string', description: 'ID do autor da postagem' }
+          },
+          required: ['autorId']
+        },
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+              message: { type: 'string' }
+            }
+          },
+          400: {
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+              error: { type: 'string' }
+            }
+          },
+          403: {
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+              error: { type: 'string' }
+            }
+          },
+          404: {
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+              error: { type: 'string' }
+            }
+          },
+          500: {
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+              error: { type: 'string' }
+            }
+          }
+        }
+      }
+    },
     async (request, reply) => {
       try {
         const { id } = request.params;
         const { autorId } = request.body;
         
         if (!ObjectId.isValid(id)) {
-          return reply.status(400).send({
+          return reply.code(400).send({
             success: false,
             error: 'ID inválido',
           });
         }
 
         if (!autorId || !ObjectId.isValid(autorId)) {
-          return reply.status(400).send({
+          return reply.code(400).send({
             success: false,
             error: 'ID de autor é obrigatório e deve ser válido',
           });
@@ -505,7 +567,7 @@ export async function postagensRoutes(fastify: FastifyInstance) {
           .findOne({ _id: new ObjectId(id) });
         
         if (!postagem) {
-          return reply.status(404).send({
+          return reply.code(404).send({
             success: false,
             error: 'Postagem não encontrada',
           });
@@ -513,7 +575,7 @@ export async function postagensRoutes(fastify: FastifyInstance) {
 
         // Verifica se o usuário é o autor da postagem
         if (postagem.autorId.toString() !== autorId) {
-          return reply.status(403).send({
+          return reply.code(403).send({
             success: false,
             error: 'Você não tem permissão para deletar esta postagem',
           });
@@ -523,10 +585,26 @@ export async function postagensRoutes(fastify: FastifyInstance) {
           .deleteOne({ _id: new ObjectId(id) });
         
         if (result.deletedCount === 0) {
-          return reply.status(404).send({
+          return reply.code(404).send({
             success: false,
             error: 'Postagem não encontrada',
           });
+        }
+
+        // Desvincula o autor da matéria (tag) se não houver mais postagens com essa tag
+        const restantes = await db.collection<Postagem>(COLLECTIONS.POSTAGENS).countDocuments({
+          autorId: postagem.autorId,
+          tag: postagem.tag
+        });
+
+        if (restantes === 0) {
+          await db.collection<Materia>(COLLECTIONS.MATERIAS).updateOne(
+            { nome: { $regex: new RegExp(`^${postagem.tag}$`, 'i') } },
+            {
+              $pull: { estudantesMatriculados: postagem.autorId },
+              $set: { atualizadoEm: new Date() }
+            }
+          );
         }
         
         return {
@@ -535,7 +613,7 @@ export async function postagensRoutes(fastify: FastifyInstance) {
         };
       } catch (error) {
         fastify.log.error(error);
-        return reply.status(500).send({
+        return reply.code(500).send({
           success: false,
           error: 'Erro ao deletar postagem',
         });
@@ -543,7 +621,6 @@ export async function postagensRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // ==================== CURTIDAS ====================
 
   // POST - Toggle curtir/descurtir uma postagem (autenticado)
   fastify.post<{ Body: { postagemId: string } }>(
@@ -770,6 +847,13 @@ export async function postagensRoutes(fastify: FastifyInstance) {
               }
             }
           }
+        },
+        500: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            error: { type: 'string' }
+          }
         }
       }
     }
@@ -801,7 +885,7 @@ export async function postagensRoutes(fastify: FastifyInstance) {
       };
     } catch (error) {
       fastify.log.error(error);
-      return reply.status(500).send({
+      return reply.code(500).send({
         success: false,
         error: 'Erro ao buscar ranking de curtidas',
       });

@@ -4,8 +4,6 @@ export const materiaSchema = {
     _id: { type: 'string', description: 'ID da matéria' },
     nome: { type: 'string', description: 'Nome da matéria' },
     descricao: { type: 'string', description: 'Descrição da matéria' },
-    professorId: { type: 'string', description: 'ID do professor responsável' },
-    professorNome: { type: 'string', description: 'Nome do professor responsável' },
     estudantesMatriculados: {
       type: 'array',
       items: { type: 'string' },
@@ -19,7 +17,7 @@ export const materiaSchema = {
 
 export const criarMateriaSchema = {
   type: 'object',
-  required: ['nome', 'descricao', 'professorId'],
+  required: ['nome', 'descricao'],
   properties: {
     nome: { 
       type: 'string', 
@@ -32,10 +30,6 @@ export const criarMateriaSchema = {
       minLength: 10,
       maxLength: 500,
       description: 'Descrição da matéria' 
-    },
-    professorId: { 
-      type: 'string',
-      description: 'ID do professor que está criando a matéria' 
     },
   },
 };
@@ -60,17 +54,11 @@ export const atualizarMateriaSchema = {
 
 export const matricularEstudanteSchema = {
   type: 'object',
-  required: ['professorId', 'estudanteId'],
+  required: ['estudanteId'],
   properties: {
-    professorId: { 
-      type: 'string',
-      description: 'ID do professor que está matriculando o estudante' 
-    },
     estudanteId: { 
       type: 'string',
       description: 'ID do estudante a ser matriculado' 
     },
   },
 };
-
-

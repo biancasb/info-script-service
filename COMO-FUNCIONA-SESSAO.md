@@ -553,7 +553,7 @@ JWT_EXPIRES_IN=7d  # 7 dias, ou: 1h, 30m, 60s
 ### Como Funciona
 
 ```
-Login: 29/11/2024 10:00:00
+Login: 01/12/2025 10:00:00
 Token criado com expiresIn: '7d'
 Token expira: 06/12/2024 10:00:00
 

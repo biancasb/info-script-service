@@ -340,4 +340,4 @@ Este projeto está sob a licença ISC.
 ---
 
 **Versão:** 2.0.0  
-**Última atualização:** 29/11/2024
+**Última atualização:** 01/12/2025

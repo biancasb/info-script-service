@@ -281,7 +281,7 @@ InfoScript Backend Docs
 
 ---
 
-**Última atualização:** 29/11/2024  
+**Última atualização:** 01/12/2025
 **Versão:** 2.0.0
 
 ---

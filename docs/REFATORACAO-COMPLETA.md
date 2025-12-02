@@ -416,6 +416,6 @@ export async function minhaRoute(fastify: FastifyInstance) {
 
 ---
 
-**Refatoração completada em:** 29/11/2024  
+**Refatoração completada em:**  01/12/2025 
 **Versão:** 2.0.0
 

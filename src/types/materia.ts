@@ -4,8 +4,6 @@ export interface Materia {
   _id?: ObjectId;
   nome: string;
   descricao: string;
-  professorId: ObjectId; // ID do professor que criou a matéria
-  professorNome?: string; // Nome do professor (desnormalizado)
   estudantesMatriculados: ObjectId[]; // IDs dos estudantes matriculados
   totalEstudantes?: number; // Contador de estudantes (calculado)
   criadoEm: Date;
@@ -15,7 +13,6 @@ export interface Materia {
 export interface CriarMateriaDTO {
   nome: string;
   descricao: string;
-  professorId: string; // ID como string, será convertido para ObjectId
 }
 
 export interface AtualizarMateriaDTO {
@@ -24,7 +21,6 @@ export interface AtualizarMateriaDTO {
 }
 
 export interface MatricularEstudanteDTO {
-  professorId: string; // ID do professor que está fazendo a operação
   estudanteId: string; // ID do estudante a ser matriculado
 }
 
@@ -41,5 +37,3 @@ export interface MateriaResponse {
   criadoEm: Date;
   atualizadoEm: Date;
 }
-
-
