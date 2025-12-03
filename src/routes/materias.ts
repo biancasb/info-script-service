@@ -420,16 +420,16 @@ export async function materiasRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // DELETE - Desmatricular um estudante de uma matéria
+  // DELETE - Desmatricular um usuário de uma matéria (professor ou estudante)
   fastify.delete<{ 
     Params: { id: string }; 
-    Body: MatricularEstudanteDTO 
+    Body: { usuarioId: string } 
   }>(
     '/materias/:id/desmatricular',
     {
       schema: {
         tags: ['Matérias'],
-        description: 'Desmatricula um estudante de uma matéria.',
+        description: 'Desmatricula um usuário (professor ou estudante) de uma matéria.',
         params: {
           type: 'object',
           properties: {
@@ -437,7 +437,13 @@ export async function materiasRoutes(fastify: FastifyInstance) {
           },
           required: ['id']
         },
-        body: matricularEstudanteSchema,
+        body: {
+          type: 'object',
+          properties: {
+            usuarioId: { type: 'string', description: 'ID do usuário a desmatricular' }
+          },
+          required: ['usuarioId']
+        },
         response: {
           200: {
             type: 'object',
@@ -446,6 +452,18 @@ export async function materiasRoutes(fastify: FastifyInstance) {
               message: { type: 'string' },
               data: materiaSchema
             }
+          },
+          400: {
+            type: 'object',
+            properties: { success: { type: 'boolean' }, error: { type: 'string' } }
+          },
+          404: {
+            type: 'object',
+            properties: { success: { type: 'boolean' }, error: { type: 'string' } }
+          },
+          500: {
+            type: 'object',
+            properties: { success: { type: 'boolean' }, error: { type: 'string' } }
           }
         }
       }
@@ -453,91 +471,90 @@ export async function materiasRoutes(fastify: FastifyInstance) {
     async (request, reply) => {
       try {
         const { id } = request.params;
-        const {estudanteId } = request.body;
-        
+        const { usuarioId } = request.body;
+
         if (!ObjectId.isValid(id)) {
-          return reply.status(400).send({
+          return reply.code(400).send({
             success: false,
             error: 'ID de matéria inválido',
           });
         }
 
-        if (!ObjectId.isValid(estudanteId)) {
-          return reply.status(400).send({
+        if (!ObjectId.isValid(usuarioId)) {
+          return reply.code(400).send({
             success: false,
-            error: 'ID de estudante inválido',
+            error: 'ID de usuário inválido',
           });
         }
-        
+
         const db = getDatabase();
 
-        // Verifica se o estudante existe
-        const estudante = await db.collection<Usuario>(COLLECTIONS.USUARIOS)
-          .findOne({ _id: new ObjectId(estudanteId) });
-        
-        if (!estudante) {
-          return reply.status(404).send({
+        // Verifica se o usuário existe
+        const usuario = await db.collection<Usuario>(COLLECTIONS.USUARIOS)
+          .findOne({ _id: new ObjectId(usuarioId) });
+
+        if (!usuario) {
+          return reply.code(404).send({
             success: false,
-            error: 'Estudante não encontrado',
+            error: 'Usuário não encontrado',
           });
         }
 
         // Verifica se a matéria existe
         const materia = await db.collection<Materia>(COLLECTIONS.MATERIAS)
           .findOne({ _id: new ObjectId(id) });
-        
+
         if (!materia) {
-          return reply.status(404).send({
+          return reply.code(404).send({
             success: false,
             error: 'Matéria não encontrada',
           });
         }
 
-        // Verifica se o estudante está matriculado
-        const estaMatriculado = materia.estudantesMatriculados.some(
-          estudanteIdMatriculado => estudanteIdMatriculado.toString() === estudanteId
+        // Verifica se o usuário está matriculado
+        const estaMatriculado = materia.estudantesMatriculados?.some(
+          idMatriculado => idMatriculado.toString() === usuarioId
         );
 
         if (!estaMatriculado) {
-          return reply.status(404).send({
+          return reply.code(404).send({
             success: false,
-            error: 'Estudante não está matriculado nesta matéria',
+            error: 'Usuário não está matriculado nesta matéria',
           });
         }
 
-        // Desmatricula o estudante
+        // Desmatricula o usuário
         const result = await db.collection<Materia>(COLLECTIONS.MATERIAS).findOneAndUpdate(
           { _id: new ObjectId(id) },
-          { 
-            $pull: { estudantesMatriculados: new ObjectId(estudanteId) },
+          {
+            $pull: { estudantesMatriculados: new ObjectId(usuarioId) },
             $set: { atualizadoEm: new Date() }
           },
           { returnDocument: 'after' }
         );
-        
+
         if (!result) {
-          return reply.status(404).send({
+          return reply.code(404).send({
             success: false,
             error: 'Matéria não encontrada',
           });
         }
-        
-        // Adiciona o contador de estudantes
+
         const materiaComContador = {
           ...result,
           totalEstudantes: result.estudantesMatriculados?.length || 0
         };
-        
+
         return {
           success: true,
-          message: `Estudante ${estudante.nome} desmatriculado com sucesso da matéria ${result.nome}`,
+            message: `Usuário ${usuario.nome} desmatriculado com sucesso da matéria ${result.nome}`,
           data: materiaComContador,
         };
       } catch (error) {
         fastify.log.error(error);
-        return reply.status(500).send({
+        return reply.code(500).send({
           success: false,
-          error: 'Erro ao desmatricular estudante',
+          error: 'Erro ao desmatricular usuário',
         });
       }
     }

@@ -36,6 +36,13 @@ export async function usuariosRoutes(fastify: FastifyInstance) {
               items: usuarioSchema
             }
           }
+        },
+        500: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            error: { type: 'string' }
+          }
         }
       }
     }
@@ -48,7 +55,7 @@ export async function usuariosRoutes(fastify: FastifyInstance) {
       return listResponse(usuariosSemSenha);
     } catch (error) {
       fastify.log.error(error);
-      return reply.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).send(
+      return reply.code(HTTP_STATUS.INTERNAL_SERVER_ERROR).send(
         errorResponse(ERROR_MESSAGES.INTERNAL_ERROR)
       );
     }
@@ -693,8 +700,7 @@ export async function usuariosRoutes(fastify: FastifyInstance) {
 
         // Busca os dados completos dos usuários que está seguindo
         const seguindo = await db.collection<Usuario>(COLLECTIONS.USUARIOS)
-          .find({ _id: { $in: usuario.seguindo } })
-          .project({ senha: 0 }) // Não retorna a senha
+          .find({ _id: { $in: usuario.seguindo } }, { projection: { senha: 0 } })
           .toArray();
         
         return {
@@ -773,8 +779,7 @@ export async function usuariosRoutes(fastify: FastifyInstance) {
 
         // Busca os dados completos dos seguidores
         const seguidores = await db.collection<Usuario>(COLLECTIONS.USUARIOS)
-          .find({ _id: { $in: usuario.seguidores } })
-          .project({ senha: 0 }) // Não retorna a senha
+          .find({ _id: { $in: usuario.seguidores } }, { projection: { senha: 0 } })
           .toArray();
         
         return {
