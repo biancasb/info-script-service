@@ -5,6 +5,7 @@ export interface Postagem {
   titulo: string;
   texto: string;
   tag: string;
+  link?: string;
   autorId: ObjectId;
   autorNome?: string;
   autorNickname?: string;
@@ -19,6 +20,7 @@ export interface CriarPostagemDTO {
   texto: string;
   tag: string;
   autorId: string;
+  link?: string;
 }
 
 export interface AtualizarPostagemDTO {

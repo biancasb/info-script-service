@@ -79,8 +79,29 @@ export async function postagensRoutes(fastify: FastifyInstance) {
               $match: query
             },
             {
+              $lookup: {
+                from: COLLECTIONS.USUARIOS,
+                localField: 'autorId',
+                foreignField: '_id',
+                as: 'autorInfo'
+              }
+            },
+            {
+              $unwind: {
+                path: '$autorInfo',
+                preserveNullAndEmptyArrays: true
+              }
+            },
+            {
               $addFields: {
-                totalCurtidas: { $size: { $ifNull: ['$curtidas', []] } }
+                totalCurtidas: { $size: { $ifNull: ['$curtidas', []] } },
+                anoIngresso: '$autorInfo.anoIngresso',
+                link: { $concat: ['/postagens/', { $toString: '$_id' }] }
+              }
+            },
+            {
+              $project: {
+                autorInfo: 0
               }
             },
             {
@@ -296,7 +317,7 @@ export async function postagensRoutes(fastify: FastifyInstance) {
     },
     async (request, reply) => {
       try {
-        const { titulo, texto, tag, autorId } = request.body;
+        const { titulo, texto, tag, autorId, link } = request.body;
         
         // Validações
         if (!titulo || !texto || !tag || !autorId) {
@@ -358,6 +379,7 @@ export async function postagensRoutes(fastify: FastifyInstance) {
           titulo,
           texto,
           tag: materiaExiste.nome, // Usa o nome correto da matéria
+          link: link || '',
           autorId: new ObjectId(autorId),
           autorNome: usuario.nome,
           autorNickname: usuario.nickname,

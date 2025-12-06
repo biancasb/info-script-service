@@ -7,9 +7,11 @@ export const postagemSchema = {
     titulo: { type: 'string', description: 'Título da postagem' },
     texto: { type: 'string', description: 'Conteúdo da postagem' },
     tag: { type: 'string', description: 'Disciplina/matéria' },
+    link: { type: 'string', description: 'Link relacionado à postagem' },
     autorId: { type: 'string', description: 'ID do autor' },
     autorNome: { type: 'string', description: 'Nome do autor' },
     autorNickname: { type: 'string', description: 'Nickname do autor' },
+    anoIngresso: { type: 'number', description: 'Ano de ingresso do autor' },
     curtidas: {
       type: 'array',
       items: { type: 'string' },
@@ -29,6 +31,7 @@ export const criarPostagemSchema = {
     texto: { type: 'string', description: 'Conteúdo da postagem', default: 'O cálculo diferencial estuda taxas de variação...' },
     tag: { type: 'string', description: 'Disciplina/matéria', default: 'Matemática' },
     autorId: { type: 'string', description: 'ID do autor', default: '692a7010729379791f7d8e34' },
+    link: { type: 'string', description: 'Adicione um link (opcional)', default: '' },
   },
 };
 
