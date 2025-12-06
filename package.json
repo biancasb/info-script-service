@@ -11,7 +11,8 @@
     "format": "prettier --write \"src/**/*.ts\"",
     "clean": "rm -rf dist",
     "prebuild": "npm run clean",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "seed:materias": "tsx scripts/seed-materias.ts"
   },
   "keywords": [
     "fastify",

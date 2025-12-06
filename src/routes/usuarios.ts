@@ -467,8 +467,10 @@ export async function usuariosRoutes(fastify: FastifyInstance) {
         // Gera token JWT
         const payload: JWTPayload = {
           userId: usuario._id!.toString(),
+          nome: usuario.nome,
           nickname: usuario.nickname,
           cargo: usuario.cargo,
+          anoIngresso: usuario.anoIngresso,
         };
 
         const token = fastify.jwt.sign(payload);

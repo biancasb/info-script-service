@@ -11,17 +11,5 @@ services:
       MONGO_INITDB_DATABASE: infoscript
     ports:
       - "27017:27017"
-    volumes:
-      - mongodb_data_dev:/data/db
-    networks:
-      - infoscript-network-dev
-
-volumes:
-  mongodb_data_dev:
-    driver: local
-
-networks:
-  infoscript-network-dev:
-    driver: bridge
 
 

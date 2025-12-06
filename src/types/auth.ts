@@ -3,8 +3,10 @@ import { Cargo } from './usuario';
 
 export interface JWTPayload {
   userId: string;
+  nome: string;
   nickname: string;
   cargo: Cargo;
+  anoIngresso: number;
 }
 
 export interface AuthenticatedUser {

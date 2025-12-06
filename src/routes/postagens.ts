@@ -348,20 +348,6 @@ export async function postagensRoutes(fastify: FastifyInstance) {
         }
 
         // Se o usuário for estudante, verifica se está matriculado em pelo menos uma matéria
-        if (usuario.cargo === Cargo.ESTUDANTE) {
-          const materiasDoEstudante = await db.collection<Materia>(COLLECTIONS.MATERIAS)
-            .countDocuments({ 
-              estudantesMatriculados: new ObjectId(autorId) 
-            });
-          
-          if (materiasDoEstudante === 0) {
-            return reply.status(403).send({
-              success: false,
-              error: 'Estudantes precisam estar matriculados em pelo menos uma matéria para criar postagens',
-            });
-          }
-        }
-
         // Verifica se a tag (matéria) existe no sistema
         const materiaExiste = await db.collection<Materia>(COLLECTIONS.MATERIAS)
           .findOne({ 
@@ -913,5 +899,94 @@ export async function postagensRoutes(fastify: FastifyInstance) {
       });
     }
   });
+
+  // GET - Busca geral em todas as postagens usando OR para todos os campos
+  fastify.get<{ Querystring: { q?: string } }>(
+    '/postagens/search/geral',
+    {
+      schema: {
+        tags: ['Postagens'],
+        description: 'Busca geral em todos os campos de postagens (título, texto, tag, autor) usando OR',
+        querystring: {
+          type: 'object',
+          properties: {
+            q: { type: 'string', description: 'Termo de busca' }
+          },
+          required: ['q']
+        },
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+              count: { type: 'number' },
+              query: { type: 'string' },
+              data: {
+                type: 'array',
+                items: postagemSchema
+              }
+            }
+          }
+        }
+      }
+    },
+    async (request, reply) => {
+      try {
+        const { q } = request.query;
+
+        if (!q || q.trim().length === 0) {
+          return reply.status(400).send({
+            success: false,
+            error: 'Termo de busca obrigatório',
+          });
+        }
+
+        const db = getDatabase();
+        const searchTerm = q.trim();
+        
+        // Cria regex para busca case-insensitive
+        const regex = new RegExp(searchTerm, 'i');
+
+        // Busca usando $or em múltiplos campos
+        const postagens = await db.collection<Postagem>(COLLECTIONS.POSTAGENS)
+          .aggregate([
+            {
+              $match: {
+                $or: [
+                  { titulo: regex },
+                  { texto: regex },
+                  { tag: regex },
+                  { 'autor.nome': regex },
+                  { 'autor.nickname': regex }
+                ]
+              }
+            },
+            {
+              $addFields: {
+                totalCurtidas: { $size: { $ifNull: ['$curtidas', []] } }
+              }
+            },
+            {
+              $sort: { criadoEm: -1 }
+            }
+          ])
+          .toArray();
+
+        return {
+          success: true,
+          count: postagens.length,
+          query: searchTerm,
+          data: postagens,
+        };
+      } catch (error) {
+        fastify.log.error(error);
+        return reply.status(500).send({
+          success: false,
+          error: 'Erro ao realizar busca',
+        });
+      }
+    }
+  );
 }
+
 
