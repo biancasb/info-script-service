@@ -1,4 +1,3 @@
-// Schemas para documentação Swagger dos endpoints de usuários
 
 export const usuarioSchema = {
   type: 'object',

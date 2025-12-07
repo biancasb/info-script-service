@@ -102,8 +102,8 @@ async function start() {
       host: config.host,
     });
 
-    console.log(`🚀 Servidor rodando em http://${config.host}:${config.port}`);
-    console.log(`📚 Swagger: http://${config.host}:${config.port}/documentacao`);
+    console.log(`Servidor rodando em http://${config.host}:${config.port}`);
+    console.log(`Swagger: http://${config.host}:${config.port}/documentacao`);
 
   } catch (error) {
     fastify.log.error(error);

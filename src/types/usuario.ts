@@ -9,11 +9,11 @@ export interface Usuario {
   _id?: ObjectId;
   nome: string;
   nickname: string;
-  senha: string; // senha com hash
+  senha: string; 
   anoIngresso: number;
   cargo: Cargo;
-  seguindo: ObjectId[]; // IDs dos usuários que este usuário segue
-  seguidores: ObjectId[]; // IDs dos usuários que seguem este usuário
+  seguindo: ObjectId[]; 
+  seguidores: ObjectId[]; 
   criadoEm?: Date;
   atualizadoEm?: Date;
 }
@@ -21,7 +21,7 @@ export interface Usuario {
 export interface CriarUsuarioDTO {
   nome: string;
   nickname: string;
-  senha: string; // senha em texto plano (será convertida para hash)
+  senha: string; 
   anoIngresso: number;
   cargo: Cargo;
 }
@@ -29,7 +29,7 @@ export interface CriarUsuarioDTO {
 export interface AtualizarUsuarioDTO {
   nome?: string;
   nickname?: string;
-  senha?: string; // senha em texto plano (será convertida para hash)
+  senha?: string; 
   anoIngresso?: number;
   cargo?: Cargo;
 }
@@ -46,6 +46,5 @@ export interface UsuarioResponse {
   totalSeguidores?: number;
   criadoEm?: Date;
   atualizadoEm?: Date;
-  // senha não é retornada por segurança
 }
 

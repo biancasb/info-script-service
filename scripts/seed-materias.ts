@@ -22,24 +22,21 @@ async function seedMaterias() {
 
   try {
     await client.connect();
-    console.log('✅ Conectado ao MongoDB');
+    console.log('Conectado ao MongoDB');
 
     const db = client.db(config.mongoDbName);
     const collection = db.collection('materias');
 
-    // Limpar coleção antes de inserir (opcional)
-    // await collection.deleteMany({});
-
     const result = await collection.insertMany(materias);
-    console.log(`✅ ${result.insertedCount} matérias inseridas com sucesso!`);
+    console.log(`${result.insertedCount} matérias inseridas com sucesso!`);
     console.log('IDs inseridos:', result.insertedIds);
 
   } catch (error) {
-    console.error('❌ Erro ao inserir matérias:', error);
+    console.error('Erro ao inserir matérias:', error);
     process.exit(1);
   } finally {
     await client.close();
-    console.log('🔌 Conexão fechada');
+    console.log('Conexão fechada');
   }
 }
 

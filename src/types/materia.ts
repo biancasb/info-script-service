@@ -4,8 +4,8 @@ export interface Materia {
   _id?: ObjectId;
   nome: string;
   descricao: string;
-  estudantesMatriculados: ObjectId[]; // IDs dos estudantes matriculados
-  totalEstudantes?: number; // Contador de estudantes (calculado)
+  estudantesMatriculados: ObjectId[]; 
+  totalEstudantes?: number; 
   criadoEm: Date;
   atualizadoEm: Date;
 }
@@ -21,7 +21,7 @@ export interface AtualizarMateriaDTO {
 }
 
 export interface MatricularEstudanteDTO {
-  estudanteId: string; // ID do estudante a ser matriculado
+  estudanteId: string; 
 }
 
 export interface MateriaResponse {

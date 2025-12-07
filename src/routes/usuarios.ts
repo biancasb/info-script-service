@@ -12,15 +12,13 @@ import { isValidObjectId, validateRequiredFields, isValidYear } from '../utils/v
 
 const SALT_ROUNDS = 10;
 
-// Função para remover a senha do objeto retornado
 function removerSenha(usuario: Usuario): UsuarioResponse {
   const { senha, ...usuarioSemSenha } = usuario;
   return usuarioSemSenha as UsuarioResponse;
 }
 
 export async function usuariosRoutes(fastify: FastifyInstance) {
-  
-  // GET - Listar todos os usuários
+
   fastify.get('/usuarios', {
     schema: {
       tags: ['Usuários'],
@@ -51,7 +49,7 @@ export async function usuariosRoutes(fastify: FastifyInstance) {
       const db = getDatabase();
       const usuarios = await db.collection<Usuario>(COLLECTIONS.USUARIOS).find().toArray();
       const usuariosSemSenha = usuarios.map(removerSenha);
-      
+
       return listResponse(usuariosSemSenha);
     } catch (error) {
       fastify.log.error(error);
@@ -61,28 +59,27 @@ export async function usuariosRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // GET - Buscar um usuário por ID
   fastify.get<{ Params: { id: string } }>('/usuarios/:id', async (request, reply) => {
     try {
       const { id } = request.params;
       const db = getDatabase();
-      
+
       if (!ObjectId.isValid(id)) {
         return reply.status(400).send({
           success: false,
           error: 'ID inválido',
         });
       }
-      
+
       const usuario = await db.collection<Usuario>(COLLECTIONS.USUARIOS).findOne({ _id: new ObjectId(id) });
-      
+
       if (!usuario) {
         return reply.status(404).send({
           success: false,
           error: 'Usuário não encontrado',
         });
       }
-      
+
       return {
         success: true,
         data: removerSenha(usuario),
@@ -96,21 +93,20 @@ export async function usuariosRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // GET - Buscar usuário por nickname
   fastify.get<{ Params: { nickname: string } }>('/usuarios/nickname/:nickname', async (request, reply) => {
     try {
       const { nickname } = request.params;
       const db = getDatabase();
-      
+
       const usuario = await db.collection<Usuario>(COLLECTIONS.USUARIOS).findOne({ nickname });
-      
+
       if (!usuario) {
         return reply.status(404).send({
           success: false,
           error: 'Usuário não encontrado',
         });
       }
-      
+
       return {
         success: true,
         data: removerSenha(usuario),
@@ -124,23 +120,22 @@ export async function usuariosRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // GET - Listar usuários por cargo
   fastify.get<{ Params: { cargo: string } }>('/usuarios/cargo/:cargo', async (request, reply) => {
     try {
       const { cargo } = request.params;
-      
+
       if (!Object.values(Cargo).includes(cargo as Cargo)) {
         return reply.status(400).send({
           success: false,
           error: 'Cargo inválido. Use "estudante" ou "professor"',
         });
       }
-      
+
       const db = getDatabase();
       const usuarios = await db.collection<Usuario>(COLLECTIONS.USUARIOS).find({ cargo: cargo as Cargo }).toArray();
-      
+
       const usuariosSemSenha = usuarios.map(removerSenha);
-      
+
       return {
         success: true,
         count: usuariosSemSenha.length,
@@ -155,7 +150,6 @@ export async function usuariosRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // POST - Criar um novo usuário
   fastify.post<{ Body: CriarUsuarioDTO }>('/usuarios', {
     schema: {
       tags: ['Usuários'],
@@ -189,8 +183,7 @@ export async function usuariosRoutes(fastify: FastifyInstance) {
   }, async (request, reply) => {
     try {
       const { nome, nickname, senha, anoIngresso, cargo } = request.body;
-      
-      // Validações
+
       if (!nome || !nickname || !senha || !anoIngresso || !cargo) {
         return reply.status(400).send({
           success: false,
@@ -214,8 +207,7 @@ export async function usuariosRoutes(fastify: FastifyInstance) {
       }
 
       const db = getDatabase();
-      
-      // Verifica se o nickname já existe
+
       const usuarioExistente = await db.collection<Usuario>(COLLECTIONS.USUARIOS).findOne({ nickname });
       if (usuarioExistente) {
         return reply.status(409).send({
@@ -223,10 +215,9 @@ export async function usuariosRoutes(fastify: FastifyInstance) {
           error: 'Nickname já está em uso',
         });
       }
-      
-      // Hash da senha
+
       const senhaHash = await bcrypt.hash(senha, SALT_ROUNDS);
-      
+
       const novoUsuario: Usuario = {
         nome,
         nickname,
@@ -238,9 +229,9 @@ export async function usuariosRoutes(fastify: FastifyInstance) {
         criadoEm: new Date(),
         atualizadoEm: new Date(),
       };
-      
+
       const result = await db.collection<Usuario>(COLLECTIONS.USUARIOS).insertOne(novoUsuario);
-      
+
       return reply.status(201).send({
         success: true,
         message: 'Usuário criado com sucesso',
@@ -258,24 +249,22 @@ export async function usuariosRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // PUT - Atualizar um usuário
   fastify.put<{ Params: { id: string }; Body: AtualizarUsuarioDTO }>(
     '/usuarios/:id',
     async (request, reply) => {
       try {
         const { id } = request.params;
         const { nome, nickname, senha, anoIngresso, cargo } = request.body;
-        
+
         if (!ObjectId.isValid(id)) {
           return reply.status(400).send({
             success: false,
             error: 'ID inválido',
           });
         }
-        
+
         const db = getDatabase();
-        
-        // Verifica se o usuário existe
+
         const usuarioExistente = await db.collection<Usuario>(COLLECTIONS.USUARIOS).findOne({ _id: new ObjectId(id) });
         if (!usuarioExistente) {
           return reply.status(404).send({
@@ -283,14 +272,13 @@ export async function usuariosRoutes(fastify: FastifyInstance) {
             error: 'Usuário não encontrado',
           });
         }
-        
+
         const updateData: Partial<Usuario> = {
           atualizadoEm: new Date(),
         };
-        
+
         if (nome) updateData.nome = nome;
         if (nickname) {
-          // Verifica se o novo nickname já está em uso por outro usuário
           const nicknameEmUso = await db.collection<Usuario>(COLLECTIONS.USUARIOS).findOne({
             nickname,
             _id: { $ne: new ObjectId(id) },
@@ -325,27 +313,27 @@ export async function usuariosRoutes(fastify: FastifyInstance) {
           }
           updateData.cargo = cargo;
         }
-        
-        if (Object.keys(updateData).length === 1) { // Apenas atualizadoEm
+
+        if (Object.keys(updateData).length === 1) {
           return reply.status(400).send({
             success: false,
             error: 'Nenhum campo para atualizar',
           });
         }
-        
+
         const result = await db.collection<Usuario>(COLLECTIONS.USUARIOS).findOneAndUpdate(
           { _id: new ObjectId(id) },
           { $set: updateData },
           { returnDocument: 'after' }
         );
-        
+
         if (!result) {
           return reply.status(404).send({
             success: false,
             error: 'Usuário não encontrado',
           });
         }
-        
+
         return {
           success: true,
           message: 'Usuário atualizado com sucesso',
@@ -361,28 +349,27 @@ export async function usuariosRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // DELETE - Deletar um usuário
   fastify.delete<{ Params: { id: string } }>('/usuarios/:id', async (request, reply) => {
     try {
       const { id } = request.params;
-      
+
       if (!ObjectId.isValid(id)) {
         return reply.status(400).send({
           success: false,
           error: 'ID inválido',
         });
       }
-      
+
       const db = getDatabase();
       const result = await db.collection<Usuario>(COLLECTIONS.USUARIOS).deleteOne({ _id: new ObjectId(id) });
-      
+
       if (result.deletedCount === 0) {
         return reply.status(404).send({
           success: false,
           error: 'Usuário não encontrado',
         });
       }
-      
+
       return {
         success: true,
         message: 'Usuário deletado com sucesso',
@@ -396,7 +383,6 @@ export async function usuariosRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // POST - Login (retorna JWT token)
   fastify.post<{ Body: { nickname: string; senha: string } }>(
     '/usuarios/login',
     {
@@ -437,26 +423,26 @@ export async function usuariosRoutes(fastify: FastifyInstance) {
     async (request, reply) => {
       try {
         const { nickname, senha } = request.body;
-        
+
         if (!nickname || !senha) {
           return reply.status(400).send({
             success: false,
             error: 'Nickname e senha são obrigatórios',
           });
         }
-        
+
         const db = getDatabase();
         const usuario = await db.collection<Usuario>(COLLECTIONS.USUARIOS).findOne({ nickname });
-        
+
         if (!usuario) {
           return reply.status(401).send({
             success: false,
             error: 'Credenciais inválidas',
           });
         }
-        
+
         const senhaValida = await bcrypt.compare(senha, usuario.senha);
-        
+
         if (!senhaValida) {
           return reply.status(401).send({
             success: false,
@@ -464,7 +450,6 @@ export async function usuariosRoutes(fastify: FastifyInstance) {
           });
         }
 
-        // Gera token JWT
         const payload: JWTPayload = {
           userId: usuario._id!.toString(),
           nome: usuario.nome,
@@ -474,7 +459,7 @@ export async function usuariosRoutes(fastify: FastifyInstance) {
         };
 
         const token = fastify.jwt.sign(payload);
-        
+
         return {
           success: true,
           message: 'Login realizado com sucesso',
@@ -498,9 +483,6 @@ export async function usuariosRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // ==================== SEGUIDORES ====================
-
-  // POST - Toggle seguir/deixar de seguir (autenticado)
   fastify.post<{ Body: { targetUserId: string } }>(
     '/usuarios/toggle-seguir',
     {
@@ -539,8 +521,7 @@ export async function usuariosRoutes(fastify: FastifyInstance) {
       try {
         const { userId } = request.user as JWTPayload;
         const { targetUserId } = request.body;
-        
-        // Validações
+
         if (!targetUserId) {
           return reply.status(400).send({
             success: false,
@@ -565,13 +546,12 @@ export async function usuariosRoutes(fastify: FastifyInstance) {
         const db = getDatabase();
         const usuarioObjId = new ObjectId(userId);
         const targetObjId = new ObjectId(targetUserId);
-        
-        // Verifica se ambos os usuários existem
+
         const [usuario, targetUsuario] = await Promise.all([
           db.collection<Usuario>(COLLECTIONS.USUARIOS).findOne({ _id: usuarioObjId }),
           db.collection<Usuario>(COLLECTIONS.USUARIOS).findOne({ _id: targetObjId }),
         ]);
-        
+
         if (!usuario || !targetUsuario) {
           return reply.status(404).send({
             success: false,
@@ -579,11 +559,9 @@ export async function usuariosRoutes(fastify: FastifyInstance) {
           });
         }
 
-        // Verifica se já está seguindo
         const jaSeguindo = usuario.seguindo?.some(id => id.toString() === targetUserId);
-        
+
         if (jaSeguindo) {
-          // Deixa de seguir
           await Promise.all([
             db.collection<Usuario>(COLLECTIONS.USUARIOS).updateOne(
               { _id: usuarioObjId },
@@ -600,14 +578,13 @@ export async function usuariosRoutes(fastify: FastifyInstance) {
               }
             ),
           ]);
-          
+
           return {
             success: true,
             message: `Você deixou de seguir ${targetUsuario.nome} (@${targetUsuario.nickname})`,
             action: 'deixou_de_seguir',
           };
         } else {
-          // Segue
           await Promise.all([
             db.collection<Usuario>(COLLECTIONS.USUARIOS).updateOne(
               { _id: usuarioObjId },
@@ -624,7 +601,7 @@ export async function usuariosRoutes(fastify: FastifyInstance) {
               }
             ),
           ]);
-          
+
           return {
             success: true,
             message: `Você agora está seguindo ${targetUsuario.nome} (@${targetUsuario.nickname})`,
@@ -641,7 +618,6 @@ export async function usuariosRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // GET - Listar quem o usuário está seguindo
   fastify.get<{ Params: { usuarioId: string } }>(
     '/usuarios/:usuarioId/seguindo',
     {
@@ -673,7 +649,7 @@ export async function usuariosRoutes(fastify: FastifyInstance) {
     async (request, reply) => {
       try {
         const { usuarioId } = request.params;
-        
+
         if (!ObjectId.isValid(usuarioId)) {
           return reply.status(400).send({
             success: false,
@@ -684,7 +660,7 @@ export async function usuariosRoutes(fastify: FastifyInstance) {
         const db = getDatabase();
         const usuario = await db.collection<Usuario>(COLLECTIONS.USUARIOS)
           .findOne({ _id: new ObjectId(usuarioId) });
-        
+
         if (!usuario) {
           return reply.status(404).send({
             success: false,
@@ -700,11 +676,10 @@ export async function usuariosRoutes(fastify: FastifyInstance) {
           };
         }
 
-        // Busca os dados completos dos usuários que está seguindo
         const seguindo = await db.collection<Usuario>(COLLECTIONS.USUARIOS)
           .find({ _id: { $in: usuario.seguindo } }, { projection: { senha: 0 } })
           .toArray();
-        
+
         return {
           success: true,
           count: seguindo.length,
@@ -720,7 +695,6 @@ export async function usuariosRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // GET - Listar seguidores do usuário
   fastify.get<{ Params: { usuarioId: string } }>(
     '/usuarios/:usuarioId/seguidores',
     {
@@ -752,7 +726,7 @@ export async function usuariosRoutes(fastify: FastifyInstance) {
     async (request, reply) => {
       try {
         const { usuarioId } = request.params;
-        
+
         if (!ObjectId.isValid(usuarioId)) {
           return reply.status(400).send({
             success: false,
@@ -763,7 +737,7 @@ export async function usuariosRoutes(fastify: FastifyInstance) {
         const db = getDatabase();
         const usuario = await db.collection<Usuario>(COLLECTIONS.USUARIOS)
           .findOne({ _id: new ObjectId(usuarioId) });
-        
+
         if (!usuario) {
           return reply.status(404).send({
             success: false,
@@ -779,11 +753,10 @@ export async function usuariosRoutes(fastify: FastifyInstance) {
           };
         }
 
-        // Busca os dados completos dos seguidores
         const seguidores = await db.collection<Usuario>(COLLECTIONS.USUARIOS)
           .find({ _id: { $in: usuario.seguidores } }, { projection: { senha: 0 } })
           .toArray();
-        
+
         return {
           success: true,
           count: seguidores.length,

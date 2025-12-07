@@ -9,6 +9,7 @@ export interface Postagem {
   autorId: ObjectId;
   autorNome?: string;
   autorNickname?: string;
+  anoIngresso?: number;
   curtidas: ObjectId[];
   totalCurtidas?: number;
   criadoEm: Date;

@@ -9,8 +9,6 @@ import { postagemSchema, criarPostagemSchema } from '../schemas/postagem.schema'
 import { COLLECTIONS } from '../constants';
 
 export async function postagensRoutes(fastify: FastifyInstance) {
-  
-  // GET - Feed unificado (personalizado se autenticado, geral se não)
   fastify.get<{ Querystring: { tag?: string } }>(
     '/postagens',
     {
@@ -96,7 +94,13 @@ export async function postagensRoutes(fastify: FastifyInstance) {
               $addFields: {
                 totalCurtidas: { $size: { $ifNull: ['$curtidas', []] } },
                 anoIngresso: '$autorInfo.anoIngresso',
-                link: { $concat: ['/postagens/', { $toString: '$_id' }] }
+                link: {
+                  $cond: [
+                    { $gt: [{ $strLenCP: { $ifNull: ['$link', ''] } }, 0] },
+                    '$link',
+                    { $concat: ['/postagens/', { $toString: '$_id' }] }
+                  ]
+                }
               }
             },
             {
@@ -127,7 +131,6 @@ export async function postagensRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // GET - Buscar uma postagem por ID
   fastify.get<{ Params: { id: string } }>('/postagens/:id', async (request, reply) => {
     try {
       const { id } = request.params;
@@ -173,7 +176,6 @@ export async function postagensRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // GET - Listar postagens de um usuário específico
   fastify.get<{ Params: { usuarioId: string } }>(
     '/postagens/usuario/:usuarioId',
     async (request, reply) => {
@@ -219,7 +221,6 @@ export async function postagensRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // GET - Listar postagens por tag (disciplina)
   fastify.get<{ Params: { tag: string } }>(
     '/postagens/tag/:tag',
     async (request, reply) => {
@@ -227,7 +228,6 @@ export async function postagensRoutes(fastify: FastifyInstance) {
         const { tag } = request.params;
         
         const db = getDatabase();
-        // Busca case-insensitive
         const postagens = await db.collection<Postagem>(COLLECTIONS.POSTAGENS)
           .aggregate([
             {
@@ -260,7 +260,6 @@ export async function postagensRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // GET - Listar todas as tags únicas
   fastify.get('/postagens/tags/lista', async (_request, reply) => {
     try {
       const db = getDatabase();
@@ -281,7 +280,6 @@ export async function postagensRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // POST - Criar uma nova postagem
   fastify.post<{ Body: CriarPostagemDTO }>(
     '/postagens',
     {
@@ -319,7 +317,6 @@ export async function postagensRoutes(fastify: FastifyInstance) {
       try {
         const { titulo, texto, tag, autorId, link } = request.body;
         
-        // Validações
         if (!titulo || !texto || !tag || !autorId) {
           return reply.status(400).send({
             success: false,
@@ -336,7 +333,6 @@ export async function postagensRoutes(fastify: FastifyInstance) {
 
         const db = getDatabase();
         
-        // Verifica se o usuário existe
         const usuario = await db.collection<Usuario>(COLLECTIONS.USUARIOS)
           .findOne({ _id: new ObjectId(autorId) });
         
@@ -347,8 +343,6 @@ export async function postagensRoutes(fastify: FastifyInstance) {
           });
         }
 
-        // Se o usuário for estudante, verifica se está matriculado em pelo menos uma matéria
-        // Verifica se a tag (matéria) existe no sistema
         const materiaExiste = await db.collection<Materia>(COLLECTIONS.MATERIAS)
           .findOne({ 
             nome: { $regex: new RegExp(`^${tag}$`, 'i') } 
@@ -364,19 +358,18 @@ export async function postagensRoutes(fastify: FastifyInstance) {
         const novaPostagem: Postagem = {
           titulo,
           texto,
-          tag: materiaExiste.nome, // Usa o nome correto da matéria
-          link: link || '',
+          tag: materiaExiste.nome,
+          link: link || undefined,
           autorId: new ObjectId(autorId),
           autorNome: usuario.nome,
           autorNickname: usuario.nickname,
+          anoIngresso: usuario.anoIngresso,
           curtidas: [],
           criadoEm: new Date(),
           atualizadoEm: new Date(),
         };
         
         const result = await db.collection<Postagem>(COLLECTIONS.POSTAGENS).insertOne(novaPostagem);
-
-        // Vincula o autor à matéria (tag) ao criar a postagem
         await db.collection<Materia>(COLLECTIONS.MATERIAS).updateOne(
           { nome: { $regex: new RegExp(`^${materiaExiste.nome}$`, 'i') } },
           {
@@ -403,7 +396,6 @@ export async function postagensRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // PUT - Atualizar uma postagem
   fastify.put<{ Params: { id: string }; Body: AtualizarPostagemDTO & { autorId: string } }>(
     '/postagens/:id',
     async (request, reply) => {
@@ -427,7 +419,6 @@ export async function postagensRoutes(fastify: FastifyInstance) {
         
         const db = getDatabase();
         
-        // Verifica se a postagem existe
         const postagemExistente = await db.collection<Postagem>(COLLECTIONS.POSTAGENS)
           .findOne({ _id: new ObjectId(id) });
         
@@ -438,7 +429,6 @@ export async function postagensRoutes(fastify: FastifyInstance) {
           });
         }
 
-        // Verifica se o usuário é o autor da postagem
         if (postagemExistente.autorId.toString() !== autorId) {
           return reply.status(403).send({
             success: false,
@@ -454,7 +444,7 @@ export async function postagensRoutes(fastify: FastifyInstance) {
         if (texto) updateData.texto = texto;
         if (tag) updateData.tag = tag;
         
-        if (Object.keys(updateData).length === 1) { // Apenas atualizadoEm
+        if (Object.keys(updateData).length === 1) {
           return reply.status(400).send({
             success: false,
             error: 'Nenhum campo para atualizar',
@@ -489,7 +479,6 @@ export async function postagensRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // DELETE - Deletar uma postagem
   fastify.delete<{ Params: { id: string }; Body: { autorId: string } }>(
     '/postagens/:id',
     {
@@ -570,7 +559,6 @@ export async function postagensRoutes(fastify: FastifyInstance) {
         
         const db = getDatabase();
         
-        // Verifica se a postagem existe
         const postagem = await db.collection<Postagem>(COLLECTIONS.POSTAGENS)
           .findOne({ _id: new ObjectId(id) });
         
@@ -581,7 +569,6 @@ export async function postagensRoutes(fastify: FastifyInstance) {
           });
         }
 
-        // Verifica se o usuário é o autor da postagem
         if (postagem.autorId.toString() !== autorId) {
           return reply.code(403).send({
             success: false,
@@ -599,7 +586,6 @@ export async function postagensRoutes(fastify: FastifyInstance) {
           });
         }
 
-        // Desvincula o autor da matéria (tag) se não houver mais postagens com essa tag
         const restantes = await db.collection<Postagem>(COLLECTIONS.POSTAGENS).countDocuments({
           autorId: postagem.autorId,
           tag: postagem.tag
@@ -630,7 +616,6 @@ export async function postagensRoutes(fastify: FastifyInstance) {
   );
 
 
-  // POST - Toggle curtir/descurtir uma postagem (autenticado)
   fastify.post<{ Body: { postagemId: string } }>(
     '/postagens/toggle-curtida',
     {
@@ -671,7 +656,6 @@ export async function postagensRoutes(fastify: FastifyInstance) {
         const { userId } = request.user as JWTPayload;
         const { postagemId } = request.body;
         
-        // Validações
         if (!postagemId) {
           return reply.status(400).send({
             success: false,
@@ -690,7 +674,6 @@ export async function postagensRoutes(fastify: FastifyInstance) {
         const usuarioObjId = new ObjectId(userId);
         const postagemObjId = new ObjectId(postagemId);
         
-        // Verifica se a postagem existe
         const postagem = await db.collection<Postagem>(COLLECTIONS.POSTAGENS).findOne({ _id: postagemObjId });
         
         if (!postagem) {
@@ -700,14 +683,12 @@ export async function postagensRoutes(fastify: FastifyInstance) {
           });
         }
 
-        // Verifica se já curtiu
         const jaCurtiu = postagem.curtidas?.some(id => id.toString() === userId);
         
         let result;
         let action: 'curtiu' | 'descurtiu';
         
         if (jaCurtiu) {
-          // Descurte
           result = await db.collection<Postagem>(COLLECTIONS.POSTAGENS).findOneAndUpdate(
             { _id: postagemObjId },
             { 
@@ -718,7 +699,6 @@ export async function postagensRoutes(fastify: FastifyInstance) {
           );
           action = 'descurtiu';
         } else {
-          // Curte
           result = await db.collection<Postagem>(COLLECTIONS.POSTAGENS).findOneAndUpdate(
             { _id: postagemObjId },
             { 
@@ -746,7 +726,6 @@ export async function postagensRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // GET - Listar usuários que curtiram uma postagem
   fastify.get<{ Params: { postagemId: string } }>(
     '/postagens/:postagemId/curtidas',
     {
@@ -807,10 +786,9 @@ export async function postagensRoutes(fastify: FastifyInstance) {
           };
         }
 
-        // Busca os dados dos usuários que curtiram
         const usuariosQueCurtiram = await db.collection<Usuario>(COLLECTIONS.USUARIOS)
           .find({ _id: { $in: postagem.curtidas } })
-          .project({ senha: 0 }) // Não retorna a senha
+          .project({ senha: 0 }) 
           .toArray();
         
         return {
@@ -828,7 +806,6 @@ export async function postagensRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // GET - Postagens mais curtidas (ranking)
   fastify.get('/postagens/ranking/curtidas', {
     schema: {
       tags: ['Postagens'],
@@ -869,7 +846,6 @@ export async function postagensRoutes(fastify: FastifyInstance) {
     try {
       const db = getDatabase();
       
-      // Busca postagens ordenadas por número de curtidas
       const postagens = await db.collection<Postagem>(COLLECTIONS.POSTAGENS)
         .aggregate([
           {
@@ -881,7 +857,7 @@ export async function postagensRoutes(fastify: FastifyInstance) {
             $sort: { totalCurtidas: -1 }
           },
           {
-            $limit: 20 // Top 20
+            $limit: 20 
           }
         ])
         .toArray();
@@ -900,7 +876,6 @@ export async function postagensRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // GET - Busca geral em todas as postagens usando OR para todos os campos
   fastify.get<{ Querystring: { q?: string } }>(
     '/postagens/search/geral',
     {
@@ -944,10 +919,8 @@ export async function postagensRoutes(fastify: FastifyInstance) {
         const db = getDatabase();
         const searchTerm = q.trim();
         
-        // Cria regex para busca case-insensitive
         const regex = new RegExp(searchTerm, 'i');
 
-        // Busca usando $or em múltiplos campos
         const postagens = await db.collection<Postagem>(COLLECTIONS.POSTAGENS)
           .aggregate([
             {

@@ -7,8 +7,6 @@ import { materiaSchema, criarMateriaSchema, matricularEstudanteSchema } from '..
 import { COLLECTIONS } from '../constants';
 
 export async function materiasRoutes(fastify: FastifyInstance) {
-  
-  // GET - Listar todas as matérias
   fastify.get('/materias', {
     schema: {
       tags: ['Matérias'],
@@ -45,7 +43,7 @@ export async function materiasRoutes(fastify: FastifyInstance) {
             }
           },
           {
-            $sort: { nome: 1 } // Ordenar por nome
+            $sort: { nome: 1 }
           }
         ])
         .toArray();
@@ -64,7 +62,6 @@ export async function materiasRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // GET - Buscar uma matéria por ID
   fastify.get<{ Params: { id: string } }>('/materias/:id', {
     schema: {
       tags: ['Matérias'],
@@ -131,7 +128,6 @@ export async function materiasRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // GET - Listar matérias de um usuário (estudante ou professor)
   fastify.get<{ Params: { usuarioId: string } }>(
     '/materias/usuario/:usuarioId',
     {
@@ -221,7 +217,6 @@ export async function materiasRoutes(fastify: FastifyInstance) {
   );
 
 
-  // DELETE - Deletar uma matéria pelo ID
   fastify.delete<{ Params: { id: string } }>(
     '/materias/:id',
     {
@@ -297,7 +292,6 @@ export async function materiasRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // POST - Matricular um usuário na matéria (professor ou estudante)
   fastify.post<{ 
     Params: { id: string }; 
     Body: MatricularEstudanteDTO 
@@ -348,7 +342,6 @@ export async function materiasRoutes(fastify: FastifyInstance) {
         
         const db = getDatabase();
 
-        // Verifica se o usuário existe
         const estudante = await db.collection<Usuario>(COLLECTIONS.USUARIOS)
           .findOne({ _id: new ObjectId(estudanteId) });
         
@@ -359,7 +352,6 @@ export async function materiasRoutes(fastify: FastifyInstance) {
           });
         }
 
-        // Verifica se a matéria existe
         const materia = await db.collection<Materia>(COLLECTIONS.MATERIAS)
           .findOne({ _id: new ObjectId(id) });
         
@@ -370,7 +362,6 @@ export async function materiasRoutes(fastify: FastifyInstance) {
           });
         }
 
-        // Verifica se o usuário já está matriculado
         const jaMatriculado = materia.estudantesMatriculados?.some(
           estudanteIdMatriculado => estudanteIdMatriculado.toString() === estudanteId
         );
@@ -382,7 +373,6 @@ export async function materiasRoutes(fastify: FastifyInstance) {
           });
         }
 
-        // Matricula o estudante
         const result = await db.collection<Materia>(COLLECTIONS.MATERIAS).findOneAndUpdate(
           { _id: new ObjectId(id) },
           { 
@@ -399,7 +389,6 @@ export async function materiasRoutes(fastify: FastifyInstance) {
           });
         }
         
-        // Adiciona o contador de estudantes
         const materiaComContador = {
           ...result,
           totalEstudantes: result.estudantesMatriculados?.length || 0
@@ -420,7 +409,6 @@ export async function materiasRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // DELETE - Desmatricular um usuário de uma matéria (professor ou estudante)
   fastify.delete<{ 
     Params: { id: string }; 
     Body: { usuarioId: string } 
@@ -489,7 +477,6 @@ export async function materiasRoutes(fastify: FastifyInstance) {
 
         const db = getDatabase();
 
-        // Verifica se o usuário existe
         const usuario = await db.collection<Usuario>(COLLECTIONS.USUARIOS)
           .findOne({ _id: new ObjectId(usuarioId) });
 
@@ -500,7 +487,6 @@ export async function materiasRoutes(fastify: FastifyInstance) {
           });
         }
 
-        // Verifica se a matéria existe
         const materia = await db.collection<Materia>(COLLECTIONS.MATERIAS)
           .findOne({ _id: new ObjectId(id) });
 
@@ -511,7 +497,6 @@ export async function materiasRoutes(fastify: FastifyInstance) {
           });
         }
 
-        // Verifica se o usuário está matriculado
         const estaMatriculado = materia.estudantesMatriculados?.some(
           idMatriculado => idMatriculado.toString() === usuarioId
         );
@@ -523,7 +508,6 @@ export async function materiasRoutes(fastify: FastifyInstance) {
           });
         }
 
-        // Desmatricula o usuário
         const result = await db.collection<Materia>(COLLECTIONS.MATERIAS).findOneAndUpdate(
           { _id: new ObjectId(id) },
           {

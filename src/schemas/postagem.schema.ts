@@ -1,4 +1,3 @@
-// Schemas para documentação Swagger dos endpoints de postagens
 
 export const postagemSchema = {
   type: 'object',
