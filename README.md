@@ -27,6 +27,14 @@ Servidor: http://localhost:3000
 - Matérias: CRUD (professores), matricular/desmatricular estudantes, listar por usuário
 - Postagens: CRUD, feed geral/personalizado, curtir/descurtir, filtro por tag/matéria, ranking de curtidas
 
+## Seed de matérias (tags) — obrigatório para filtros
+
+```bash
+npm run seed:materias
+```
+
+Requisitos: MongoDB ativo e `.env` preenchido. O script `scripts/seed-materias.ts` cria/atualiza as matérias base usadas como tags nas postagens.
+
 ## Autenticação (exemplo)
 
 Login
@@ -74,14 +82,6 @@ Authorization: Bearer eyJ...
 | POST | `/postagens/toggle-curtida` | Curtir/descurtir | Sim |
 
 *Estudantes precisam estar matriculados em ao menos uma matéria para postar.
-
-## Seed de matérias (tags) — obrigatório para filtros
-
-```bash
-npm run seed:materias
-```
-
-Requisitos: MongoDB ativo e `.env` preenchido. O script `scripts/seed-materias.ts` cria/atualiza as matérias base usadas como tags.
 
 ## Arquitetura (visão geral)
 
