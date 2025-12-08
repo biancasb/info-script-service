@@ -1,9 +1,9 @@
 import { FastifyInstance } from 'fastify';
 import { ObjectId } from 'mongodb';
 import { getDatabase } from '../config/database';
-import { Materia, CriarMateriaDTO, AtualizarMateriaDTO, MatricularEstudanteDTO } from '../types/materia';
-import { Usuario, Cargo } from '../types/usuario';
-import { materiaSchema, criarMateriaSchema, matricularEstudanteSchema } from '../schemas/materia.schema';
+import { Materia, MatricularEstudanteDTO } from '../types/materia';
+import { Usuario } from '../types/usuario';
+import { materiaSchema, matricularEstudanteSchema } from '../schemas/materia.schema';
 import { COLLECTIONS } from '../constants';
 
 export async function materiasRoutes(fastify: FastifyInstance) {

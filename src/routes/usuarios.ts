@@ -4,11 +4,10 @@ import bcrypt from 'bcrypt';
 import { getDatabase } from '../config/database';
 import { Usuario, CriarUsuarioDTO, AtualizarUsuarioDTO, UsuarioResponse, Cargo } from '../types/usuario';
 import { JWTPayload } from '../types/auth';
-import { usuarioSchema, criarUsuarioSchema, loginSchema, seguirSchema } from '../schemas/usuario.schema';
+import { usuarioSchema, criarUsuarioSchema, loginSchema } from '../schemas/usuario.schema';
 import { config } from '../config/env';
-import { COLLECTIONS, ERROR_MESSAGES, SUCCESS_MESSAGES, HTTP_STATUS } from '../constants';
-import { successResponse, errorResponse, listResponse } from '../utils/response';
-import { isValidObjectId, validateRequiredFields, isValidYear } from '../utils/validation';
+import { COLLECTIONS, ERROR_MESSAGES, HTTP_STATUS } from '../constants';
+import { errorResponse, listResponse } from '../utils/response';
 
 const SALT_ROUNDS = 10;
 
