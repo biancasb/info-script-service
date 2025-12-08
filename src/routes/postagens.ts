@@ -50,7 +50,6 @@ export async function postagensRoutes(fastify: FastifyInstance) {
         let feedType: 'personalizado' | 'geral' = feedTypeParam || 'geral';
         let authenticated = false;
 
-        // Se o usuário está autenticado E não forçou feedType=geral, usar feed personalizado
         if (request.user && feedTypeParam !== 'geral') {
           const { userId } = request.user as JWTPayload;
           authenticated = true;
@@ -933,8 +932,8 @@ export async function postagensRoutes(fastify: FastifyInstance) {
                   { titulo: regex },
                   { texto: regex },
                   { tag: regex },
-                  { 'autor.nome': regex },
-                  { 'autor.nickname': regex }
+                  { autorNome: regex },
+                  { autorNickname: regex }
                 ]
               }
             },
