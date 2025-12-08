@@ -10,7 +10,7 @@ Pré-requisitos: Node.js 18+, MongoDB 6+, npm/yarn.
 git clone https://github.com/biancasb/info-script-service.git
 cd info-script-service
 npm install
-cp .env.example .env  # ajuste as variáveis
+cp .env.example .env
 npm run dev
 ```
 
@@ -101,12 +101,12 @@ Stack: Fastify, TypeScript, MongoDB, JWT (@fastify/jwt), Swagger/OpenAPI, JSON S
 ## Scripts
 
 ```bash
-npm run dev            # desenvolvimento
-npm run build          # build
-npm start              # rodar build
-npm run lint           # lint
-npm run format         # formatar
-npm run seed:materias  # popular matérias base
+npm run dev
+npm run build
+npm start
+npm run lint
+npm run format
+npm run seed:materias
 ```
 
 ## Variáveis de ambiente

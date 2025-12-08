@@ -101,7 +101,7 @@ export async function postagensRoutes(fastify: FastifyInstance) {
                   $cond: [
                     { $gt: [{ $strLenCP: { $ifNull: ['$link', ''] } }, 0] },
                     '$link',
-                    { $concat: ['/postagens/', { $toString: '$_id' }] }
+                    null
                   ]
                 }
               }
