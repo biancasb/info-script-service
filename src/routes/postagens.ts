@@ -2,25 +2,26 @@ import { FastifyInstance } from 'fastify';
 import { ObjectId } from 'mongodb';
 import { getDatabase } from '../config/database';
 import { Postagem, CriarPostagemDTO, AtualizarPostagemDTO } from '../types/postagem';
-import { Usuario, Cargo } from '../types/usuario';
+import { Usuario } from '../types/usuario';
 import { Materia } from '../types/materia';
 import { JWTPayload } from '../types/auth';
 import { postagemSchema, criarPostagemSchema } from '../schemas/postagem.schema';
 import { COLLECTIONS } from '../constants';
 
 export async function postagensRoutes(fastify: FastifyInstance) {
-  fastify.get<{ Querystring: { tag?: string } }>(
+  fastify.get<{ Querystring: { tag?: string; feedType?: 'personalizado' | 'geral' } }>(
     '/postagens',
     {
       onRequest: [fastify.optionalAuthenticate],
       schema: {
         tags: ['Postagens'],
-        description: 'Retorna feed de postagens. Se autenticado: feed personalizado (usuário + quem ele segue). Se não autenticado: todas as postagens. Filtro opcional por tag.',
+        description: 'Retorna feed de postagens. Se autenticado: feed personalizado (usuário + quem ele segue) ou geral. Se não autenticado: todas as postagens. Filtro opcional por tag.',
         security: [{ bearerAuth: [] }, {}],
         querystring: {
           type: 'object',
           properties: {
-            tag: { type: 'string', description: 'Filtrar por disciplina/matéria' }
+            tag: { type: 'string', description: 'Filtrar por disciplina/matéria' },
+            feedType: { type: 'string', enum: ['personalizado', 'geral'], description: 'Tipo de feed (geral ou personalizado)' }
           }
         },
         response: {
@@ -42,14 +43,15 @@ export async function postagensRoutes(fastify: FastifyInstance) {
     },
     async (request, reply) => {
       try {
-        const { tag } = request.query;
+        const { tag, feedType: feedTypeParam } = request.query;
         const db = getDatabase();
 
         let query: any = {};
-        let feedType: 'personalizado' | 'geral' = 'geral';
+        let feedType: 'personalizado' | 'geral' = feedTypeParam || 'geral';
         let authenticated = false;
 
-        if (request.user) {
+        // Se o usuário está autenticado E não forçou feedType=geral, usar feed personalizado
+        if (request.user && feedTypeParam !== 'geral') {
           const { userId } = request.user as JWTPayload;
           authenticated = true;
           feedType = 'personalizado';
@@ -65,6 +67,8 @@ export async function postagensRoutes(fastify: FastifyInstance) {
             
             query.autorId = { $in: idsParaBuscar };
           }
+        } else if (request.user) {
+          authenticated = true;
         }
 
         if (tag) {
